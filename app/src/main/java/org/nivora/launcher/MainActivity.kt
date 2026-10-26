@@ -306,6 +306,7 @@ private fun NivoraHome(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = 20.dp)
+                .then(homeSwipeModifier)
         ) {
             when (screen) {
                 LauncherScreen.HOME -> {
@@ -373,7 +374,6 @@ private fun NivoraHome(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .then(homeSwipeModifier)
                     ) {
                         if (visibleHomeApps.isEmpty()) {
                             Box(
