@@ -65,6 +65,18 @@ private data class LauncherApp(
 
 class MainActivity : ComponentActivity() {
 
+    private var refreshApps: (() -> Unit)? = null
+
+    override fun onResume() {
+        super.onResume()
+        refreshApps?.invoke()
+    }
+
+    override fun onDestroy() {
+        refreshApps = null
+        super.onDestroy()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Midnight.toArgb()
@@ -83,6 +95,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 NivoraHome(
                     loadApps = { queryApps() },
+                    registerRefresh = { refresh -> refreshApps = refresh },
                     launchApp = { packageName -> launchPackage(packageName) }
                 )
             }
@@ -128,13 +141,19 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun NivoraHome(
     loadApps: () -> List<LauncherApp>,
+    registerRefresh: ((() -> Unit) -> Unit),
     launchApp: (String) -> Unit
 ) {
     var apps by remember { mutableStateOf(emptyList<LauncherApp>()) }
     var search by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
+    val refresh: () -> Unit = {
         apps = loadApps()
+    }
+
+    LaunchedEffect(Unit) {
+        registerRefresh(refresh)
+        refresh()
     }
 
     val filteredApps = remember(apps, search) {
