@@ -15,8 +15,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -181,56 +184,93 @@ private fun NivoraHome(
     val pageCount = maxOf(1, (apps.size + pageSize - 1) / pageSize)
     val safePage = homePage.coerceIn(0, pageCount - 1)
 
-    val homeSwipeModifier = Modifier.pointerInput(screen, safePage, pageCount) {
-        var totalHorizontal = 0f
+    val currentScreen = rememberUpdatedState(screen)
+    val currentPage = rememberUpdatedState(safePage)
+    val currentPageCount = rememberUpdatedState(pageCount)
+    val currentSearch = rememberUpdatedState(search)
 
-        detectHorizontalDragGestures(
-            onHorizontalDrag = { _, amount -> totalHorizontal += amount },
-            onDragEnd = {
-                if (kotlin.math.abs(totalHorizontal) > 72f && search.isBlank()) {
-                    if (totalHorizontal < 0f && safePage < pageCount - 1) {
-                        homePage = safePage + 1
-                    } else if (totalHorizontal > 0f && safePage > 0) {
-                        homePage = safePage - 1
+    val homeSwipeModifier = Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(
+                requireUnconsumed = false,
+                pass = PointerEventPass.Initial
+            )
+
+            var totalX = 0f
+            var totalY = 0f
+            var handled = false
+
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull() ?: break
+                val delta = change.positionChange()
+                totalX += delta.x
+                totalY += delta.y
+
+                if (!handled &&
+                    kotlin.math.abs(totalY) > 72f &&
+                    kotlin.math.abs(totalY) > kotlin.math.abs(totalX) * 1.2f
+                ) {
+                    if (totalY < 0f &&
+                        currentScreen.value == LauncherScreen.HOME
+                    ) {
+                        change.consume()
+                        search = ""
+                        screen = LauncherScreen.LIBRARY
+                        handled = true
                     }
+                } else if (!handled &&
+                    kotlin.math.abs(totalX) > 72f &&
+                    kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.2f &&
+                    currentScreen.value == LauncherScreen.HOME &&
+                    currentSearch.value.isBlank()
+                ) {
+                    change.consume()
+                    if (totalX < 0f &&
+                        currentPage.value < currentPageCount.value - 1
+                    ) {
+                        homePage = currentPage.value + 1
+                    } else if (totalX > 0f && currentPage.value > 0) {
+                        homePage = currentPage.value - 1
+                    }
+                    handled = true
                 }
-                totalHorizontal = 0f
-            },
-            onDragCancel = { totalHorizontal = 0f }
-        )
+            } while (event.changes.any { it.pressed })
+        }
     }
 
-    val librarySwipeModifier = Modifier.pointerInput(screen) {
-        var totalVertical = 0f
+    val libraryVerticalSwipeModifier = Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(
+                requireUnconsumed = false,
+                pass = PointerEventPass.Initial
+            )
 
-        detectVerticalDragGestures(
-            onVerticalDrag = { _, amount -> totalVertical += amount },
-            onDragEnd = {
-                if (totalVertical > 72f) {
+            var totalX = 0f
+            var totalY = 0f
+            var handled = false
+
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull() ?: break
+                val delta = change.positionChange()
+                totalX += delta.x
+                totalY += delta.y
+
+                if (!handled &&
+                    totalY > 72f &&
+                    totalY > kotlin.math.abs(totalX) * 1.2f &&
+                    currentScreen.value == LauncherScreen.LIBRARY
+                ) {
+                    change.consume()
                     search = ""
                     screen = LauncherScreen.HOME
+                    handled = true
                 }
-                totalVertical = 0f
-            },
-            onDragCancel = { totalVertical = 0f }
-        )
+            } while (event.changes.any { it.pressed })
+        }
     }
 
-    val homeVerticalSwipeModifier = Modifier.pointerInput(screen) {
-        var totalVertical = 0f
-
-        detectVerticalDragGestures(
-            onVerticalDrag = { _, amount -> totalVertical += amount },
-            onDragEnd = {
-                if (totalVertical < -72f && screen == LauncherScreen.HOME) {
-                    search = ""
-                    screen = LauncherScreen.LIBRARY
-                }
-                totalVertical = 0f
-            },
-            onDragCancel = { totalVertical = 0f }
-        )
-    }
     val homeApps = apps.drop(safePage * pageSize).take(pageSize)
 
     val dockApps = remember(apps) {
@@ -334,7 +374,6 @@ private fun NivoraHome(
                             .weight(1f)
                             .fillMaxWidth()
                             .then(homeSwipeModifier)
-                            .then(homeVerticalSwipeModifier)
                     ) {
                         if (visibleHomeApps.isEmpty()) {
                             Box(
@@ -458,7 +497,7 @@ private fun NivoraHome(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(librarySwipeModifier)
+                            .then(libraryVerticalSwipeModifier)
                     ) {
                     Spacer(Modifier.height(18.dp))
                     Row(
