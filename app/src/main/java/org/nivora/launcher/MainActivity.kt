@@ -138,6 +138,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class LauncherScreen {
+    HOME, LIBRARY, SETTINGS
+}
+
 @Composable
 private fun NivoraHome(
     loadApps: () -> List<LauncherApp>,
@@ -146,10 +150,10 @@ private fun NivoraHome(
 ) {
     var apps by remember { mutableStateOf(emptyList<LauncherApp>()) }
     var search by remember { mutableStateOf("") }
+    var screen by remember { mutableStateOf(LauncherScreen.HOME) }
+    var homePage by remember { mutableStateOf(0) }
 
-    val refresh: () -> Unit = {
-        apps = loadApps()
-    }
+    val refresh: () -> Unit = { apps = loadApps() }
 
     LaunchedEffect(Unit) {
         registerRefresh(refresh)
@@ -160,6 +164,35 @@ private fun NivoraHome(
         apps.filter { it.label.contains(search.trim(), ignoreCase = true) }
     }
 
+    val pageSize = 16
+    val pageCount = maxOf(1, (apps.size + pageSize - 1) / pageSize)
+    val safePage = homePage.coerceIn(0, pageCount - 1)
+    val homeApps = apps.drop(safePage * pageSize).take(pageSize)
+
+    val dockApps = remember(apps) {
+        val preferred = listOf(
+            listOf("phone", "dialer"),
+            listOf("message", "sms"),
+            listOf("chrome", "browser"),
+            listOf("camera")
+        )
+        val selected = preferred.mapNotNull { keywords ->
+            apps.firstOrNull { app ->
+                keywords.any { word ->
+                    app.label.contains(word, ignoreCase = true) ||
+                        app.packageName.contains(word, ignoreCase = true)
+                }
+            }
+        }.distinctBy { it.packageName }.toMutableList()
+
+        apps.forEach { app ->
+            if (selected.size < 4 &&
+                selected.none { it.packageName == app.packageName }
+            ) selected.add(app)
+        }
+        selected.take(4)
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Midnight
@@ -168,149 +201,322 @@ private fun NivoraHome(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(horizontal = 22.dp)
+                .padding(horizontal = 20.dp)
         ) {
-            Spacer(Modifier.height(24.dp))
+            when (screen) {
+                LauncherScreen.HOME -> {
+                    Spacer(Modifier.height(22.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Nivora",
-                        color = Color.White,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Your space. Your pace.",
-                        color = Muted,
-                        fontSize = 13.sp
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Panel),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "N",
-                        color = Cyan,
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Light
-                    )
-                }
-            }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Your space",
+                            color = Color.White,
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "⌕",
+                            color = Color.White,
+                            fontSize = 27.sp,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable {
+                                    search = ""
+                                    screen = LauncherScreen.LIBRARY
+                                }
+                                .padding(8.dp)
+                        )
+                    }
 
-            Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(28.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Panel)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("⌕", color = Cyan, fontSize = 23.sp)
-                Spacer(Modifier.size(10.dp))
-                BasicTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        color = Color.White,
-                        fontSize = 15.sp
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    decorationBox = { innerTextField ->
-                        Box {
-                            if (search.isEmpty()) {
-                                Text(
-                                    "Search your apps",
-                                    color = Muted,
-                                    fontSize = 15.sp
+                    if (homeApps.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No launchable apps found", color = Muted)
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(4),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(20.dp)
+                        ) {
+                            items(homeApps, key = { it.packageName }) { app ->
+                                AppTile(
+                                    app = app,
+                                    onClick = { launchApp(app.packageName) }
                                 )
                             }
-                            innerTextField()
                         }
                     }
-                )
-                if (search.isNotEmpty()) {
-                    Text(
-                        text = "×",
-                        color = Muted,
-                        fontSize = 21.sp,
-                        modifier = Modifier.clickable { search = "" }
-                    )
-                }
-            }
 
-            Spacer(Modifier.height(25.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(pageCount) { index ->
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .size(if (index == safePage) 8.dp else 6.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (index == safePage) Color.White
+                                        else Muted.copy(alpha = 0.55f)
+                                    )
+                                    .clickable { homePage = index }
+                            )
+                        }
+                    }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (search.isBlank()) "Your apps" else "Search results",
-                    color = Color.White,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(Modifier.weight(1f))
-                Text("${filteredApps.size}", color = Muted, fontSize = 13.sp)
-            }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(Panel)
+                            .padding(horizontal = 12.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        dockApps.forEach { app ->
+                            val bitmap = remember(app.icon) {
+                                app.icon.toImageBitmap()
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .clickable { launchApp(app.packageName) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (bitmap != null) {
+                                    androidx.compose.foundation.Image(
+                                        bitmap = bitmap,
+                                        contentDescription = app.label,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(3.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                    )
+                                } else {
+                                    Text(
+                                        app.label.take(1),
+                                        color = Cyan,
+                                        fontSize = 24.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
 
-            Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(8.dp))
 
-            if (filteredApps.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (apps.isEmpty()) {
-                            "No launchable apps found"
-                        } else {
-                            "No apps match your search"
-                        },
-                        color = Muted,
-                        fontSize = 14.sp
-                    )
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 72.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
-                ) {
-                    items(filteredApps, key = { it.packageName }) { app ->
-                        AppTile(
-                            app = app,
-                            onClick = { launchApp(app.packageName) }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "App Library",
+                            color = Muted,
+                            fontSize = 13.sp,
+                            modifier = Modifier
+                                .clickable { screen = LauncherScreen.LIBRARY }
+                                .padding(8.dp)
+                        )
+                        Text(
+                            "Settings",
+                            color = Muted,
+                            fontSize = 13.sp,
+                            modifier = Modifier
+                                .clickable { screen = LauncherScreen.SETTINGS }
+                                .padding(8.dp)
                         )
                     }
                 }
+
+                LauncherScreen.LIBRARY -> {
+                    Spacer(Modifier.height(18.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "App Library",
+                            color = Color.White,
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "Done",
+                            color = Cyan,
+                            modifier = Modifier
+                                .clickable {
+                                    search = ""
+                                    screen = LauncherScreen.HOME
+                                }
+                                .padding(8.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(18.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Panel)
+                            .padding(horizontal = 14.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("⌕", color = Cyan, fontSize = 22.sp)
+                        Spacer(Modifier.size(10.dp))
+                        BasicTextField(
+                            value = search,
+                            onValueChange = { search = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                color = Color.White,
+                                fontSize = 15.sp
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Search
+                            ),
+                            decorationBox = { innerTextField ->
+                                Box {
+                                    if (search.isEmpty()) {
+                                        Text(
+                                            "Search apps",
+                                            color = Muted,
+                                            fontSize = 15.sp
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                        if (search.isNotEmpty()) {
+                            Text(
+                                "×",
+                                color = Muted,
+                                fontSize = 22.sp,
+                                modifier = Modifier.clickable { search = "" }
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(18.dp))
+                    Text("${filteredApps.size} apps", color = Muted, fontSize = 13.sp)
+                    Spacer(Modifier.height(12.dp))
+
+                    if (filteredApps.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                if (apps.isEmpty()) "No launchable apps found"
+                                else "No apps match your search",
+                                color = Muted
+                            )
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 72.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(18.dp)
+                        ) {
+                            items(filteredApps, key = { it.packageName }) { app ->
+                                AppTile(
+                                    app = app,
+                                    onClick = { launchApp(app.packageName) }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                LauncherScreen.SETTINGS -> {
+                    Spacer(Modifier.height(18.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Settings",
+                            color = Color.White,
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "Done",
+                            color = Cyan,
+                            modifier = Modifier
+                                .clickable { screen = LauncherScreen.HOME }
+                                .padding(8.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+
+                    listOf(
+                        "Appearance" to "Visual settings are not implemented yet",
+                        "Home screen" to "Icon layout and pages",
+                        "Dock" to "Dock customization is planned",
+                        "Privacy" to "App discovery runs on this device",
+                        "About Nivora" to "Version 0.1 · Development build"
+                    ).forEach { (title, detail) ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Panel)
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                title,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(Modifier.height(5.dp))
+                            Text(detail, color = Muted, fontSize = 13.sp)
+                        }
+                    }
+
+                    Spacer(Modifier.weight(1f))
+                }
             }
-
-            GlassDock(
-                onSearch = { search = "" }
-            )
-
-            Spacer(Modifier.height(12.dp))
         }
     }
 }
+
 
 @Composable
 private fun AppTile(
