@@ -44,13 +44,16 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +66,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import android.graphics.Bitmap
 import android.graphics.Canvas
 
@@ -168,6 +173,13 @@ private fun NivoraHome(
     var screen by remember { mutableStateOf(LauncherScreen.HOME) }
     var homePage by remember { mutableStateOf(0) }
     var menuExpanded by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        LauncherPreferences(context.applicationContext)
+    }
+    val showAppLabels by preferences.showAppLabels.collectAsState(initial = true)
+    val coroutineScope = rememberCoroutineScope()
 
     val refresh: () -> Unit = { apps = loadApps() }
 
@@ -417,7 +429,8 @@ private fun NivoraHome(
                                     items(animatedApps, key = { it.packageName }) { app ->
                                         AppTile(
                                             app = app,
-                                            onClick = { launchApp(app.packageName) }
+                                            onClick = { launchApp(app.packageName) },
+                                            showLabel = showAppLabels
                                         )
                                     }
                                 }
@@ -599,7 +612,8 @@ private fun NivoraHome(
                             items(filteredApps, key = { it.packageName }) { app ->
                                 AppTile(
                                     app = app,
-                                    onClick = { launchApp(app.packageName) }
+                                    onClick = { launchApp(app.packageName) },
+                                    showLabel = showAppLabels
                                 )
                             }
                         }
@@ -632,8 +646,41 @@ private fun NivoraHome(
 
                     Spacer(Modifier.height(24.dp))
 
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Panel)
+                            .padding(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Show app labels",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(Modifier.height(5.dp))
+                                Text(
+                                    "Show or hide names under app icons",
+                                    color = Muted,
+                                    fontSize = 13.sp
+                                )
+                            }
+                            Switch(
+                                checked = showAppLabels,
+                                onCheckedChange = { enabled ->
+                                    coroutineScope.launch {
+                                        preferences.setShowAppLabels(enabled)
+                                    }
+                                }
+                            )
+                        }
+                    }
+
                     listOf(
-                        "Appearance" to "Visual settings are not implemented yet",
                         "Home screen" to "Icon layout and pages",
                         "Dock" to "Dock customization is planned",
                         "Privacy" to "App discovery runs on this device",
@@ -669,7 +716,8 @@ private fun NivoraHome(
 @Composable
 private fun AppTile(
     app: LauncherApp,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    showLabel: Boolean = true
 ) {
     val iconBitmap = remember(app.icon) { app.icon.toImageBitmap() }
 
@@ -701,16 +749,17 @@ private fun AppTile(
             }
         }
 
-        Spacer(Modifier.height(7.dp))
-
-        Text(
-            text = app.label,
-            color = Color.White,
-            fontSize = 11.sp,
-            lineHeight = 14.sp,
-            maxLines = 2,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
+        if (showLabel) {
+            Spacer(Modifier.height(7.dp))
+            Text(
+                text = app.label,
+                color = Color.White,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                maxLines = 2,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }
 
