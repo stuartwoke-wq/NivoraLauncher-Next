@@ -5,9 +5,19 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +37,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -152,6 +164,7 @@ private fun NivoraHome(
     var search by remember { mutableStateOf("") }
     var screen by remember { mutableStateOf(LauncherScreen.HOME) }
     var homePage by remember { mutableStateOf(0) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     val refresh: () -> Unit = { apps = loadApps() }
 
@@ -167,6 +180,57 @@ private fun NivoraHome(
     val pageSize = 16
     val pageCount = maxOf(1, (apps.size + pageSize - 1) / pageSize)
     val safePage = homePage.coerceIn(0, pageCount - 1)
+
+    val homeSwipeModifier = Modifier.pointerInput(screen, safePage, pageCount) {
+        var totalHorizontal = 0f
+
+        detectHorizontalDragGestures(
+            onHorizontalDrag = { _, amount -> totalHorizontal += amount },
+            onDragEnd = {
+                if (kotlin.math.abs(totalHorizontal) > 72f && search.isBlank()) {
+                    if (totalHorizontal < 0f && safePage < pageCount - 1) {
+                        homePage = safePage + 1
+                    } else if (totalHorizontal > 0f && safePage > 0) {
+                        homePage = safePage - 1
+                    }
+                }
+                totalHorizontal = 0f
+            },
+            onDragCancel = { totalHorizontal = 0f }
+        )
+    }
+
+    val librarySwipeModifier = Modifier.pointerInput(screen) {
+        var totalVertical = 0f
+
+        detectVerticalDragGestures(
+            onVerticalDrag = { _, amount -> totalVertical += amount },
+            onDragEnd = {
+                if (totalVertical > 72f) {
+                    search = ""
+                    screen = LauncherScreen.HOME
+                }
+                totalVertical = 0f
+            },
+            onDragCancel = { totalVertical = 0f }
+        )
+    }
+
+    val homeVerticalSwipeModifier = Modifier.pointerInput(screen) {
+        var totalVertical = 0f
+
+        detectVerticalDragGestures(
+            onVerticalDrag = { _, amount -> totalVertical += amount },
+            onDragEnd = {
+                if (totalVertical < -72f && screen == LauncherScreen.HOME) {
+                    search = ""
+                    screen = LauncherScreen.LIBRARY
+                }
+                totalVertical = 0f
+            },
+            onDragCancel = { totalVertical = 0f }
+        )
+    }
     val homeApps = apps.drop(safePage * pageSize).take(pageSize)
 
     val dockApps = remember(apps) {
@@ -205,81 +269,144 @@ private fun NivoraHome(
         ) {
             when (screen) {
                 LauncherScreen.HOME -> {
-                    Spacer(Modifier.height(22.dp))
+                    Spacer(Modifier.height(14.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Panel)
+                            .padding(start = 14.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "Your space",
-                            color = Color.White,
-                            fontSize = 25.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            "⌕",
-                            color = Color.White,
-                            fontSize = 27.sp,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable {
-                                    search = ""
-                                    screen = LauncherScreen.LIBRARY
+                        Text("⌕", color = Cyan, fontSize = 23.sp)
+                        Spacer(Modifier.size(10.dp))
+                        BasicTextField(
+                            value = search,
+                            onValueChange = { search = it; homePage = 0 },
+                            modifier = Modifier.weight(1f).padding(vertical = 11.dp),
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                color = Color.White,
+                                fontSize = 15.sp
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            decorationBox = { innerTextField ->
+                                Box {
+                                    if (search.isEmpty()) {
+                                        Text("Search apps", color = Muted, fontSize = 15.sp)
+                                    }
+                                    innerTextField()
                                 }
-                                .padding(8.dp)
+                            }
                         )
-                    }
-
-                    Spacer(Modifier.height(28.dp))
-
-                    if (homeApps.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("No launchable apps found", color = Muted)
-                        }
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(4),
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(20.dp)
-                        ) {
-                            items(homeApps, key = { it.packageName }) { app ->
-                                AppTile(
-                                    app = app,
-                                    onClick = { launchApp(app.packageName) }
+                        Box {
+                            Text(
+                                "⋮",
+                                color = Color.White,
+                                fontSize = 25.sp,
+                                modifier = Modifier
+                                    .clickable { menuExpanded = true }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Settings") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        screen = LauncherScreen.SETTINGS
+                                    }
                                 )
                             }
                         }
                     }
 
-                    Row(
+                    Spacer(Modifier.height(24.dp))
+
+                    val visibleHomeApps =
+                        if (search.isBlank()) homeApps else filteredApps.take(pageSize)
+
+                    Box(
                         modifier = Modifier
+                            .weight(1f)
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                            .then(homeSwipeModifier)
+                            .then(homeVerticalSwipeModifier)
                     ) {
-                        repeat(pageCount) { index ->
+                        if (visibleHomeApps.isEmpty()) {
                             Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 4.dp)
-                                    .size(if (index == safePage) 8.dp else 6.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (index == safePage) Color.White
-                                        else Muted.copy(alpha = 0.55f)
-                                    )
-                                    .clickable { homePage = index }
-                            )
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    if (search.isBlank()) "No launchable apps found"
+                                    else "No apps match your search",
+                                    color = Muted
+                                )
+                            }
+                        } else {
+                            AnimatedContent(
+                                targetState = if (search.isBlank()) safePage else 0,
+                                modifier = Modifier.fillMaxSize(),
+                                transitionSpec = {
+                                    val direction = if (targetState > initialState) 1 else -1
+                                    slideInHorizontally(
+                                        animationSpec = tween(220),
+                                        initialOffsetX = { width -> direction * width / 5 }
+                                    ) + fadeIn(animationSpec = tween(180)) togetherWith
+                                        slideOutHorizontally(
+                                            animationSpec = tween(220),
+                                            targetOffsetX = { width -> -direction * width / 5 }
+                                        ) + fadeOut(animationSpec = tween(160))
+                                },
+                                label = "HomePageTransition"
+                            ) { animatedPage ->
+                                val animatedApps = if (search.isBlank()) {
+                                    apps.drop(animatedPage * pageSize).take(pageSize)
+                                } else {
+                                    filteredApps.take(pageSize)
+                                }
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(4),
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                                ) {
+                                    items(animatedApps, key = { it.packageName }) { app ->
+                                        AppTile(
+                                            app = app,
+                                            onClick = { launchApp(app.packageName) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (search.isBlank()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            repeat(pageCount) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 4.dp)
+                                        .size(if (index == safePage) 8.dp else 6.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (index == safePage) Color.White
+                                            else Muted.copy(alpha = 0.55f)
+                                        )
+                                        .clickable { homePage = index }
+                                )
+                            }
                         }
                     }
 
@@ -325,33 +452,14 @@ private fun NivoraHome(
 
                     Spacer(Modifier.height(8.dp))
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "App Library",
-                            color = Muted,
-                            fontSize = 13.sp,
-                            modifier = Modifier
-                                .clickable { screen = LauncherScreen.LIBRARY }
-                                .padding(8.dp)
-                        )
-                        Text(
-                            "Settings",
-                            color = Muted,
-                            fontSize = 13.sp,
-                            modifier = Modifier
-                                .clickable { screen = LauncherScreen.SETTINGS }
-                                .padding(8.dp)
-                        )
-                    }
                 }
 
                 LauncherScreen.LIBRARY -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(librarySwipeModifier)
+                    ) {
                     Spacer(Modifier.height(18.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -458,6 +566,7 @@ private fun NivoraHome(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                    }
                 }
 
                 LauncherScreen.SETTINGS -> {
@@ -562,50 +671,6 @@ private fun AppTile(
             lineHeight = 14.sp,
             maxLines = 2,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-    }
-}
-
-@Composable
-private fun GlassDock(onSearch: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
-            .background(Panel)
-            .padding(horizontal = 18.dp, vertical = 13.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        DockItem(symbol = "⌂", label = "Home", selected = true, onClick = onSearch)
-        DockItem(symbol = "▦", label = "Apps", selected = false, onClick = onSearch)
-        DockItem(symbol = "⚙", label = "Settings", selected = false, onClick = onSearch)
-    }
-}
-
-@Composable
-private fun DockItem(
-    symbol: String,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 3.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = symbol,
-            color = if (selected) Cyan else Lavender,
-            fontSize = 23.sp
-        )
-        Text(
-            text = label,
-            color = if (selected) Color.White else Muted,
-            fontSize = 10.sp
         )
     }
 }
