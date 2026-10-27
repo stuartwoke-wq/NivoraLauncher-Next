@@ -159,7 +159,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class LauncherScreen {
-    HOME, LIBRARY, SETTINGS
+    HOME, LIBRARY, SETTINGS, DOCK
 }
 
 @Composable
@@ -179,6 +179,7 @@ private fun NivoraHome(
         LauncherPreferences(context.applicationContext)
     }
     val showAppLabels by preferences.showAppLabels.collectAsState(initial = true)
+    val savedDockPackages by preferences.dockAppPackages.collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
 
     val refresh: () -> Unit = { apps = loadApps() }
@@ -285,7 +286,7 @@ private fun NivoraHome(
 
     val homeApps = apps.drop(safePage * pageSize).take(pageSize)
 
-    val dockApps = remember(apps) {
+    val automaticDockApps = remember(apps) {
         val preferred = listOf(
             listOf("phone", "dialer"),
             listOf("message", "sms"),
@@ -307,6 +308,16 @@ private fun NivoraHome(
             ) selected.add(app)
         }
         selected.take(4)
+    }
+
+    val dockApps = remember(apps, savedDockPackages, automaticDockApps) {
+        if (savedDockPackages == null) {
+            automaticDockApps
+        } else {
+            savedDockPackages.mapNotNull { packageName ->
+                apps.firstOrNull { it.packageName == packageName }
+            }.take(4)
+        }
     }
 
     Surface(
@@ -622,6 +633,279 @@ private fun NivoraHome(
                     }
                 }
 
+                LauncherScreen.DOCK -> {
+                    var editingDockPackages by remember(savedDockPackages, apps) {
+                        mutableStateOf(
+                            (savedDockPackages
+                                ?: automaticDockApps.map { it.packageName })
+                                .filter { packageName ->
+                                    apps.any { it.packageName == packageName }
+                                }
+                                .take(4)
+                        )
+                    }
+                    var useAutomaticDock by remember(savedDockPackages, apps) {
+                        mutableStateOf(savedDockPackages == null)
+                    }
+
+                    Spacer(Modifier.height(18.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Customize Dock",
+                            color = Color.White,
+                            fontSize = 23.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "Back",
+                            color = Cyan,
+                            modifier = Modifier
+                                .clickable { screen = LauncherScreen.SETTINGS }
+                                .padding(8.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Choose up to four apps. Selection order determines dock order.",
+                        color = Muted,
+                        fontSize = 13.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "${editingDockPackages.size} of 4 selected",
+                        color = Cyan,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        "Dock order · first app appears on the left",
+                        color = Muted,
+                        fontSize = 12.sp
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Panel)
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        editingDockPackages.forEach { packageName ->
+                            val previewApp = apps.firstOrNull {
+                                it.packageName == packageName
+                            }
+                            if (previewApp != null) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val previewBitmap = remember(previewApp.icon) {
+                                        previewApp.icon.toImageBitmap()
+                                    }
+                                    if (previewBitmap != null) {
+                                        androidx.compose.foundation.Image(
+                                            bitmap = previewBitmap,
+                                            contentDescription = previewApp.label,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    } else {
+                                        Text(
+                                            previewApp.label.take(1),
+                                            color = Cyan,
+                                            fontSize = 20.sp
+                                        )
+                                    }
+                                    Text(
+                                        previewApp.label,
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    editingDockPackages.forEachIndexed { index, packageName ->
+                        val selectedApp = apps.firstOrNull {
+                            it.packageName == packageName
+                        }
+                        if (selectedApp != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Panel)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "${index + 1}. ${selectedApp.label}",
+                                    color = Color.White,
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 13.sp
+                                )
+                                Text(
+                                    "←",
+                                    color = if (index > 0) Cyan else Muted,
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (index > 0) {
+                                                useAutomaticDock = false
+                                                editingDockPackages =
+                                                    editingDockPackages.toMutableList().apply {
+                                                        add(index - 1, removeAt(index))
+                                                    }
+                                            }
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                                Text(
+                                    "→",
+                                    color = if (index < editingDockPackages.lastIndex) Cyan else Muted,
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (index < editingDockPackages.lastIndex) {
+                                                useAutomaticDock = false
+                                                editingDockPackages =
+                                                    editingDockPackages.toMutableList().apply {
+                                                        add(index + 1, removeAt(index))
+                                                    }
+                                            }
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                                Text(
+                                    "×",
+                                    color = Lavender,
+                                    modifier = Modifier
+                                        .clickable {
+                                            useAutomaticDock = false
+                                            editingDockPackages =
+                                                editingDockPackages.filterNot {
+                                                    it == packageName
+                                                }
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        if (useAutomaticDock) {
+                            "Automatic dock is enabled"
+                        } else {
+                            "Restore automatic selection"
+                        },
+                        color = Lavender,
+                        modifier = Modifier
+                            .clickable {
+                                useAutomaticDock = true
+                                editingDockPackages =
+                                    automaticDockApps.map { it.packageName }.take(4)
+                            }
+                            .padding(vertical = 8.dp)
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(apps, key = { it.packageName }) { app ->
+                            val selectedIndex =
+                                editingDockPackages.indexOf(app.packageName)
+
+                            Column(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        if (selectedIndex >= 0) Panel
+                                        else Color.Transparent
+                                    )
+                                    .padding(4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                AppTile(
+                                    app = app,
+                                    showLabel = true,
+                                    onClick = {
+                                        if (selectedIndex >= 0) {
+                                            useAutomaticDock = false
+                                            editingDockPackages =
+                                                editingDockPackages.filterNot {
+                                                    it == app.packageName
+                                                }
+                                        } else if (editingDockPackages.size < 4) {
+                                            useAutomaticDock = false
+                                            editingDockPackages =
+                                                editingDockPackages + app.packageName
+                                        }
+                                    }
+                                )
+
+                                Text(
+                                    text = if (selectedIndex >= 0) {
+                                        "Selected #${selectedIndex + 1}"
+                                    } else if (editingDockPackages.size >= 4) {
+                                        "Limit reached"
+                                    } else {
+                                        "Tap to add"
+                                    },
+                                    color = if (selectedIndex >= 0) Cyan else Muted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Text(
+                        "Save dock",
+                        color = Cyan,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Panel)
+                            .clickable {
+                                val chosenPackages = editingDockPackages.toList()
+                                val saveAutomatic = useAutomaticDock
+                                coroutineScope.launch {
+                                    if (saveAutomatic) {
+                                        preferences.resetDockAppPackagesToAutomatic()
+                                    } else {
+                                        preferences.setDockAppPackages(chosenPackages)
+                                    }
+                                    screen = LauncherScreen.SETTINGS
+                                }
+                            }
+                            .padding(16.dp)
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 LauncherScreen.SETTINGS -> {
                     Spacer(Modifier.height(18.dp))
                     Row(
@@ -682,7 +966,7 @@ private fun NivoraHome(
 
                     listOf(
                         "Home screen" to "Icon layout and pages",
-                        "Dock" to "Dock customization is planned",
+                        "Dock" to "Choose up to four apps for your dock",
                         "Privacy" to "App discovery runs on this device",
                         "About Nivora" to "Version 0.1 · Development build"
                     ).forEach { (title, detail) ->
@@ -692,6 +976,9 @@ private fun NivoraHome(
                                 .padding(vertical = 10.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Panel)
+                                .clickable(enabled = title == "Dock") {
+                                    screen = LauncherScreen.DOCK
+                                }
                                 .padding(16.dp)
                         ) {
                             Text(
