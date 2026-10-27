@@ -67,7 +67,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.graphics.Bitmap
 import android.graphics.Canvas
 
@@ -182,7 +185,17 @@ private fun NivoraHome(
     val savedDockPackages by preferences.dockAppPackages.collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
 
-    val refresh: () -> Unit = { apps = loadApps() }
+    var refreshJob by remember { mutableStateOf<Job?>(null) }
+
+    val refresh: () -> Unit = {
+        refreshJob?.cancel()
+        refreshJob = coroutineScope.launch {
+            val updatedApps = withContext(Dispatchers.IO) {
+                loadApps()
+            }
+            apps = updatedApps
+        }
+    }
 
     LaunchedEffect(Unit) {
         registerRefresh(refresh)
