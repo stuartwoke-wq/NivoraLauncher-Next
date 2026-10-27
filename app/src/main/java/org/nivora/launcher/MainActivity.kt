@@ -311,10 +311,11 @@ private fun NivoraHome(
     }
 
     val dockApps = remember(apps, savedDockPackages, automaticDockApps) {
-        if (savedDockPackages == null) {
+        val savedPackages = savedDockPackages
+        if (savedPackages == null) {
             automaticDockApps
         } else {
-            savedDockPackages.mapNotNull { packageName ->
+            savedPackages.mapNotNull { packageName ->
                 apps.firstOrNull { it.packageName == packageName }
             }.take(4)
         }
