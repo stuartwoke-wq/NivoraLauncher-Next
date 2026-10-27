@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -176,6 +177,7 @@ private fun NivoraHome(
     var screen by remember { mutableStateOf(LauncherScreen.HOME) }
     var homePage by remember { mutableStateOf(0) }
     var menuExpanded by remember { mutableStateOf(false) }
+    val libraryGridState = rememberLazyGridState()
 
     val context = LocalContext.current
     val preferences = remember(context) {
@@ -272,6 +274,10 @@ private fun NivoraHome(
                 pass = PointerEventPass.Initial
             )
 
+            val startedAtTop =
+                libraryGridState.firstVisibleItemIndex == 0 &&
+                libraryGridState.firstVisibleItemScrollOffset == 0
+
             var totalX = 0f
             var totalY = 0f
             var handled = false
@@ -284,6 +290,7 @@ private fun NivoraHome(
                 totalY += delta.y
 
                 if (!handled &&
+                    startedAtTop &&
                     totalY > 72f &&
                     totalY > kotlin.math.abs(totalX) * 1.2f &&
                     currentScreen.value == LauncherScreen.LIBRARY
@@ -628,6 +635,7 @@ private fun NivoraHome(
                     } else {
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(minSize = 72.dp),
+                            state = libraryGridState,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth(),
