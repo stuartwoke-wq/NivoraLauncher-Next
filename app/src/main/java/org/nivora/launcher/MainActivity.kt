@@ -3,6 +3,7 @@ package org.nivora.launcher
 import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
@@ -173,6 +174,8 @@ private fun NivoraHome(
     launchApp: (String) -> Unit
 ) {
     var apps by remember { mutableStateOf(emptyList<LauncherApp>()) }
+    var appLoadTimeMs by remember { mutableStateOf<Long?>(null) }
+    var appLoadCount by remember { mutableStateOf(0) }
     var search by remember { mutableStateOf("") }
     var screen by remember { mutableStateOf(LauncherScreen.HOME) }
     var homePage by remember { mutableStateOf(0) }
@@ -192,10 +195,14 @@ private fun NivoraHome(
     val refresh: () -> Unit = {
         refreshJob?.cancel()
         refreshJob = coroutineScope.launch {
-            val updatedApps = withContext(Dispatchers.IO) {
-                loadApps()
+            val (updatedApps, elapsedMs) = withContext(Dispatchers.IO) {
+                val startedAt = SystemClock.elapsedRealtime()
+                val result = loadApps()
+                result to (SystemClock.elapsedRealtime() - startedAt)
             }
             apps = updatedApps
+            appLoadTimeMs = elapsedMs
+            appLoadCount = updatedApps.size
         }
     }
 
@@ -536,6 +543,17 @@ private fun NivoraHome(
 
                     Spacer(Modifier.height(8.dp))
 
+                    if (appLoadTimeMs != null) {
+                        Text(
+                            text = "Diagnostic · load ${appLoadTimeMs} ms · $appLoadCount apps",
+                            color = Muted,
+                            fontSize = 10.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 4.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
 
                 LauncherScreen.LIBRARY -> {
