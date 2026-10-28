@@ -13,8 +13,13 @@ internal object CrashReportRetention {
     const val MAX_REPORTS = 5
 
     fun prune(directory: File) {
-        val reports = directory.listFiles { file ->
-            file.isFile && file.name.endsWith(".txt")
+        val reports = try {
+            directory.listFiles { file ->
+                file.isFile && file.name.endsWith(".txt")
+            }
+        } catch (_: SecurityException) {
+            // Cleanup must never interrupt crash reporting.
+            return
         } ?: return
 
         reports
@@ -27,7 +32,7 @@ internal object CrashReportRetention {
                 try {
                     report.delete()
                 } catch (_: SecurityException) {
-                    // Cleanup must not prevent crash reporting from completing.
+                    // Cleanup is best-effort; continue with other reports.
                 }
             }
     }

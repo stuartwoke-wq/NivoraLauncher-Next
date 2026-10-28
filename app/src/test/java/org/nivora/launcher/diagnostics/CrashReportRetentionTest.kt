@@ -76,4 +76,49 @@ class CrashReportRetentionTest {
             parent.deleteRecursively()
         }
     }
+
+    @Test
+    fun prunePreservesReportsWhenFewerThanLimitExist() {
+        val directory = Files.createTempDirectory("nivora-retention-test").toFile()
+
+        try {
+            val reports = (1..3).map { index ->
+                File(directory, "crash-$index.txt").apply {
+                    writeText("report $index")
+                }
+            }
+
+            CrashReportRetention.prune(directory)
+
+            assertTrue(reports.all { it.exists() })
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun pruneUsesFilenameToBreakEqualTimestampTies() {
+        val directory = Files.createTempDirectory("nivora-retention-test").toFile()
+
+        try {
+            val reports = ('a'..'f').map { letter ->
+                File(directory, "crash-$letter.txt").apply {
+                    writeText("report $letter")
+                    check(setLastModified(10_000L)) {
+                        "Could not set test timestamp for $name"
+                    }
+                }
+            }
+
+            assertTrue(reports.all { it.lastModified() == reports.first().lastModified() })
+
+            CrashReportRetention.prune(directory)
+
+            // With equal timestamps, descending filename order is retained.
+            assertFalse(reports[0].exists())
+            assertTrue(reports.drop(1).all { it.exists() })
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
 }
