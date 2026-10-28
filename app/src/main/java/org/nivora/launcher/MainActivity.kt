@@ -129,25 +129,46 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun queryApps(): List<LauncherApp> {
+        val totalStartedAt = SystemClock.elapsedRealtime()
         val pm = packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
 
         return try {
+            val queryStartedAt = SystemClock.elapsedRealtime()
             @Suppress("DEPRECATION")
-            pm.queryIntentActivities(intent, 0)
-                .mapNotNull { resolve ->
-                    val activityInfo = resolve.activityInfo ?: return@mapNotNull null
-                    if (activityInfo.packageName == packageName) return@mapNotNull null
+            val activities = pm.queryIntentActivities(intent, 0)
+            val queryMs = SystemClock.elapsedRealtime() - queryStartedAt
 
-                    LauncherApp(
-                        label = resolve.loadLabel(pm).toString(),
-                        packageName = activityInfo.packageName,
-                        icon = resolve.loadIcon(pm)
-                    )
-                }
+            val mappingStartedAt = SystemClock.elapsedRealtime()
+            val mappedApps = activities.mapNotNull { resolve ->
+                val activityInfo = resolve.activityInfo ?: return@mapNotNull null
+                if (activityInfo.packageName == packageName) return@mapNotNull null
+
+                LauncherApp(
+                    label = resolve.loadLabel(pm).toString(),
+                    packageName = activityInfo.packageName,
+                    icon = resolve.loadIcon(pm)
+                )
+            }
+            val mappingMs = SystemClock.elapsedRealtime() - mappingStartedAt
+
+            val processingStartedAt = SystemClock.elapsedRealtime()
+            val result = mappedApps
                 .distinctBy { it.packageName }
                 .sortedBy { it.label.lowercase() }
-        } catch (_: Exception) {
+            val processingMs = SystemClock.elapsedRealtime() - processingStartedAt
+            val totalMs = SystemClock.elapsedRealtime() - totalStartedAt
+
+            android.util.Log.d(
+                "NivoraAppLoad",
+                "activities=${activities.size}, apps=${result.size}, " +
+                    "query=${queryMs}ms, labels_icons=${mappingMs}ms, " +
+                    "dedupe_sort=${processingMs}ms, total=${totalMs}ms"
+            )
+
+            result
+        } catch (exception: Exception) {
+            android.util.Log.e("NivoraAppLoad", "App discovery failed", exception)
             emptyList()
         }
     }
