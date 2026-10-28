@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -174,6 +175,7 @@ private fun NivoraHome(
     launchApp: (String) -> Unit
 ) {
     var apps by remember { mutableStateOf(emptyList<LauncherApp>()) }
+    var isAppsLoading by remember { mutableStateOf(true) }
     var appLoadTimeMs by remember { mutableStateOf<Long?>(null) }
     var appLoadCount by remember { mutableStateOf(0) }
     var homeIconConversionNs by remember { mutableStateOf(0L) }
@@ -196,6 +198,7 @@ private fun NivoraHome(
 
     val refresh: () -> Unit = {
         refreshJob?.cancel()
+        if (apps.isEmpty()) isAppsLoading = true
         refreshJob = coroutineScope.launch {
             val (updatedApps, elapsedMs) = withContext(Dispatchers.IO) {
                 val startedAt = SystemClock.elapsedRealtime()
@@ -205,6 +208,7 @@ private fun NivoraHome(
             apps = updatedApps
             appLoadTimeMs = elapsedMs
             appLoadCount = updatedApps.size
+            isAppsLoading = false
         }
     }
 
@@ -433,11 +437,25 @@ private fun NivoraHome(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    if (search.isBlank()) "No launchable apps found"
-                                    else "No apps match your search",
-                                    color = Muted
-                                )
+                                if (isAppsLoading) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        CircularProgressIndicator(
+                                            color = Cyan,
+                                            modifier = Modifier.size(28.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Text("Loading apps…", color = Muted)
+                                    }
+                                } else {
+                                    Text(
+                                        if (search.isBlank()) "No launchable apps found"
+                                        else "No apps match your search",
+                                        color = Muted
+                                    )
+                                }
                             }
                         } else {
                             AnimatedContent(
@@ -651,11 +669,25 @@ private fun NivoraHome(
                                 .fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                if (apps.isEmpty()) "No launchable apps found"
-                                else "No apps match your search",
-                                color = Muted
-                            )
+                            if (isAppsLoading) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = Cyan,
+                                        modifier = Modifier.size(28.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text("Loading apps…", color = Muted)
+                                }
+                            } else {
+                                Text(
+                                    if (apps.isEmpty()) "No launchable apps found"
+                                    else "No apps match your search",
+                                    color = Muted
+                                )
+                            }
                         }
                     } else {
                         LazyVerticalGrid(
