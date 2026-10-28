@@ -176,6 +176,8 @@ private fun NivoraHome(
     var apps by remember { mutableStateOf(emptyList<LauncherApp>()) }
     var appLoadTimeMs by remember { mutableStateOf<Long?>(null) }
     var appLoadCount by remember { mutableStateOf(0) }
+    var homeIconConversionNs by remember { mutableStateOf(0L) }
+    val measuredHomeIconPackages = remember { mutableSetOf<String>() }
     var search by remember { mutableStateOf("") }
     var screen by remember { mutableStateOf(LauncherScreen.HOME) }
     var homePage by remember { mutableStateOf(0) }
@@ -469,7 +471,12 @@ private fun NivoraHome(
                                         AppTile(
                                             app = app,
                                             onClick = { launchApp(app.packageName) },
-                                            showLabel = showAppLabels
+                                            showLabel = showAppLabels,
+                                            onIconConversionMeasured = { packageName, elapsedNs ->
+                                                if (measuredHomeIconPackages.add(packageName)) {
+                                                    homeIconConversionNs += elapsedNs
+                                                }
+                                            }
                                         )
                                     }
                                 }
@@ -545,7 +552,7 @@ private fun NivoraHome(
 
                     if (appLoadTimeMs != null) {
                         Text(
-                            text = "Diagnostic · load ${appLoadTimeMs} ms · $appLoadCount apps",
+                            text = "Diagnostic · load ${appLoadTimeMs} ms · $appLoadCount apps · icons ${homeIconConversionNs / 1_000_000} ms",
                             color = Muted,
                             fontSize = 10.sp,
                             modifier = Modifier
@@ -1044,9 +1051,19 @@ private fun NivoraHome(
 private fun AppTile(
     app: LauncherApp,
     onClick: () -> Unit,
-    showLabel: Boolean = true
+    showLabel: Boolean = true,
+    onIconConversionMeasured: ((String, Long) -> Unit)? = null
 ) {
-    val iconBitmap = remember(app.icon) { app.icon.toImageBitmap() }
+    val iconResult = remember(app.icon) {
+        val startedAt = SystemClock.elapsedRealtimeNanos()
+        val bitmap = app.icon.toImageBitmap()
+        bitmap to (SystemClock.elapsedRealtimeNanos() - startedAt)
+    }
+    val iconBitmap = iconResult.first
+
+    LaunchedEffect(app.packageName, iconResult.second, onIconConversionMeasured) {
+        onIconConversionMeasured?.invoke(app.packageName, iconResult.second)
+    }
 
     Column(
         modifier = Modifier
