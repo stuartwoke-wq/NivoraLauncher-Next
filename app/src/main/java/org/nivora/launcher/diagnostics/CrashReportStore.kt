@@ -11,7 +11,6 @@ import java.util.TimeZone
 
 internal object CrashReportStore {
     private const val DIRECTORY_NAME = "crash-reports"
-    private const val MAX_REPORTS = 5
 
     fun save(context: Context, thread: Thread, throwable: Throwable) {
         val directory = File(context.filesDir, DIRECTORY_NAME)
@@ -49,11 +48,6 @@ internal object CrashReportStore {
             output.fd.sync()
         }
 
-        directory.listFiles { candidate ->
-            candidate.isFile && candidate.name.endsWith(".txt")
-        }
-            ?.sortedByDescending { it.lastModified() }
-            ?.drop(MAX_REPORTS)
-            ?.forEach { it.delete() }
+        CrashReportRetention.prune(directory)
     }
 }
