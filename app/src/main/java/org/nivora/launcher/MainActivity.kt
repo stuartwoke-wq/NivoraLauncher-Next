@@ -183,7 +183,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class LauncherScreen {
-    HOME, LIBRARY, SETTINGS, DOCK
+    HOME, LIBRARY, SETTINGS, DOCK, HOME_SETTINGS, PRIVACY, ABOUT
 }
 
 @Composable
@@ -1045,6 +1045,30 @@ private fun NivoraHome(
                     Spacer(Modifier.height(12.dp))
                 }
 
+                LauncherScreen.HOME_SETTINGS -> {
+                    SettingsInfoPage(
+                        title = "Home screen",
+                        description = "Nivora currently provides the home screen, app library, app search, app labels, and dock selection. Custom grid sizes, icon sizing controls, and additional home screen layout options are not implemented yet.",
+                        onBack = { screen = LauncherScreen.SETTINGS }
+                    )
+                }
+
+                LauncherScreen.PRIVACY -> {
+                    SettingsInfoPage(
+                        title = "Privacy",
+                        description = "Nivora discovers launchable apps through Android's package manager and stores launcher preferences using on-device DataStore. This page is informational; a complete privacy dashboard and detailed data controls are not implemented yet.",
+                        onBack = { screen = LauncherScreen.SETTINGS }
+                    )
+                }
+
+                LauncherScreen.ABOUT -> {
+                    SettingsInfoPage(
+                        title = "About Nivora",
+                        description = "Nivora Launcher\nVersion 0.1.0\nDevelopment build\n\nThis project is under active development. Some planned features are not available yet.",
+                        onBack = { screen = LauncherScreen.SETTINGS }
+                    )
+                }
+
                 LauncherScreen.SETTINGS -> {
                     Spacer(Modifier.height(18.dp))
                     Row(
@@ -1115,8 +1139,13 @@ private fun NivoraHome(
                                 .padding(vertical = 10.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Panel)
-                                .clickable(enabled = title == "Dock") {
-                                    screen = LauncherScreen.DOCK
+                                .clickable {
+                                    screen = when (title) {
+                                        "Dock" -> LauncherScreen.DOCK
+                                        "Home screen" -> LauncherScreen.HOME_SETTINGS
+                                        "Privacy" -> LauncherScreen.PRIVACY
+                                        else -> LauncherScreen.ABOUT
+                                    }
                                 }
                                 .padding(16.dp)
                         ) {
@@ -1134,6 +1163,55 @@ private fun NivoraHome(
                     Spacer(Modifier.weight(1f))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsInfoPage(
+    title: String,
+    description: String,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 25.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "Back",
+                color = Cyan,
+                modifier = Modifier
+                    .clickable(onClick = onBack)
+                    .padding(8.dp)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Panel)
+                .padding(16.dp)
+        ) {
+            Text(
+                text = description,
+                color = Muted,
+                fontSize = 14.sp,
+                lineHeight = 21.sp
+            )
         }
     }
 }
