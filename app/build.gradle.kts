@@ -19,6 +19,12 @@ android {
             "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+        }
+    }
+
     buildFeatures {
         compose = true
     }
