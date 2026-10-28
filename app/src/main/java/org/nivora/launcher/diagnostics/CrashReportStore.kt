@@ -40,10 +40,10 @@ internal object CrashReportStore {
             androidVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
             deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
             threadName = thread.name,
-            stackTrace = throwable.stackTraceToString()
+            stackTrace = CrashReportFormatter.captureStackTrace(throwable)
         )
 
-        val file = File(directory, "crash-${System.currentTimeMillis()}.txt")
+        val file = File.createTempFile("crash-", ".txt", directory)
         FileOutputStream(file).use { output ->
             output.write(report.toByteArray(Charsets.UTF_8))
             output.fd.sync()

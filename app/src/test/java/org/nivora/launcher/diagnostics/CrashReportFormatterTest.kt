@@ -40,6 +40,19 @@ class CrashReportFormatterTest {
     }
 
     @Test
+    fun capturedStackTraceIsBoundedForLargeExceptions() {
+        val throwable = IllegalStateException("large test exception")
+        throwable.stackTrace = Array(10_000) { index ->
+            StackTraceElement("ExampleClass", "method", "Example.kt", index)
+        }
+
+        val trace = CrashReportFormatter.captureStackTrace(throwable)
+
+        assertTrue(trace.contains("[stack trace truncated]"))
+        assertTrue(trace.length <= CrashReportFormatter.MAX_STACK_TRACE_CHARS)
+    }
+
+    @Test
     fun reportDoesNotAddNetworkOrSharingInstructions() {
         val report = CrashReportFormatter.format(
             timestamp = "now",
