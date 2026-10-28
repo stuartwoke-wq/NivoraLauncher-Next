@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -169,7 +170,7 @@ class MainActivity : ComponentActivity() {
             result
         } catch (exception: Exception) {
             android.util.Log.e("NivoraAppLoad", "App discovery failed", exception)
-            emptyList()
+            throw exception
         }
     }
 
@@ -216,20 +217,46 @@ private fun NivoraHome(
     val coroutineScope = rememberCoroutineScope()
 
     var refreshJob by remember { mutableStateOf<Job?>(null) }
+    var refreshGeneration by remember { mutableStateOf(0) }
+    var appLoadError by remember { mutableStateOf(false) }
 
     val refresh: () -> Unit = {
+        refreshGeneration += 1
+        val generation = refreshGeneration
+
         refreshJob?.cancel()
         if (apps.isEmpty()) isAppsLoading = true
+        appLoadError = false
+
         refreshJob = coroutineScope.launch {
-            val (updatedApps, elapsedMs) = withContext(Dispatchers.IO) {
-                val startedAt = SystemClock.elapsedRealtime()
-                val result = loadApps()
-                result to (SystemClock.elapsedRealtime() - startedAt)
+            try {
+                val (updatedApps, elapsedMs) = withContext(Dispatchers.IO) {
+                    val startedAt = SystemClock.elapsedRealtime()
+                    val result = loadApps()
+                    result to (SystemClock.elapsedRealtime() - startedAt)
+                }
+
+                if (generation == refreshGeneration) {
+                    apps = updatedApps
+                    appLoadTimeMs = elapsedMs
+                    appLoadCount = updatedApps.size
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                android.util.Log.e(
+                    "NivoraAppLoad",
+                    "App refresh failed; keeping the previous app list",
+                    exception
+                )
+                if (generation == refreshGeneration) {
+                    appLoadError = true
+                }
+            } finally {
+                if (generation == refreshGeneration) {
+                    isAppsLoading = false
+                }
             }
-            apps = updatedApps
-            appLoadTimeMs = elapsedMs
-            appLoadCount = updatedApps.size
-            isAppsLoading = false
         }
     }
 
@@ -471,11 +498,19 @@ private fun NivoraHome(
                                         Text("Loading apps…", color = Muted)
                                     }
                                 } else {
-                                    Text(
-                                        if (search.isBlank()) "No launchable apps found"
-                                        else "No apps match your search",
-                                        color = Muted
-                                    )
+                                    if (appLoadError) {
+                                        Text(
+                                            "Couldn't load apps. Tap to retry.",
+                                            color = Muted,
+                                            modifier = Modifier.clickable { refresh() }
+                                        )
+                                    } else {
+                                        Text(
+                                            if (search.isBlank()) "No launchable apps found"
+                                            else "No apps match your search",
+                                            color = Muted
+                                        )
+                                    }
                                 }
                             }
                         } else {
@@ -703,11 +738,19 @@ private fun NivoraHome(
                                     Text("Loading apps…", color = Muted)
                                 }
                             } else {
-                                Text(
-                                    if (apps.isEmpty()) "No launchable apps found"
-                                    else "No apps match your search",
-                                    color = Muted
-                                )
+                                if (appLoadError) {
+                                    Text(
+                                        "Couldn't load apps. Tap to retry.",
+                                        color = Muted,
+                                        modifier = Modifier.clickable { refresh() }
+                                    )
+                                } else {
+                                    Text(
+                                        if (apps.isEmpty()) "No launchable apps found"
+                                        else "No apps match your search",
+                                        color = Muted
+                                    )
+                                }
                             }
                         }
                     } else {
