@@ -62,21 +62,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.graphics.Bitmap
-import android.graphics.Canvas
 
 private val Midnight = Color(0xFF10141D)
 private val Panel = Color(0xCC252D3B)
@@ -84,7 +80,7 @@ private val Cyan = Color(0xFF66D9E8)
 private val Lavender = Color(0xFFC8B7FF)
 private val Muted = Color(0xFF9AA6B8)
 
-private data class LauncherApp(
+internal data class LauncherApp(
     val label: String,
     val packageName: String,
     val icon: Drawable
@@ -1139,80 +1135,5 @@ private fun NivoraHome(
                 }
             }
         }
-    }
-}
-
-
-@Composable
-private fun AppTile(
-    app: LauncherApp,
-    onClick: () -> Unit,
-    showLabel: Boolean = true,
-    onIconConversionMeasured: ((String, Long) -> Unit)? = null
-) {
-    val iconResult = remember(app.icon) {
-        val startedAt = SystemClock.elapsedRealtimeNanos()
-        val bitmap = app.icon.toImageBitmap()
-        bitmap to (SystemClock.elapsedRealtimeNanos() - startedAt)
-    }
-    val iconBitmap = iconResult.first
-
-    LaunchedEffect(app.packageName, iconResult.second, onIconConversionMeasured) {
-        onIconConversionMeasured?.invoke(app.packageName, iconResult.second)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (iconBitmap != null) {
-            androidx.compose.foundation.Image(
-                bitmap = iconBitmap,
-                contentDescription = app.label,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(13.dp))
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(Panel),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(app.label.take(1), color = Cyan, fontSize = 22.sp)
-            }
-        }
-
-        if (showLabel) {
-            Spacer(Modifier.height(7.dp))
-            Text(
-                text = app.label,
-                color = Color.White,
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                maxLines = 2,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    }
-}
-
-private fun Drawable.toImageBitmap(): ImageBitmap? {
-    return try {
-        val width = intrinsicWidth.coerceIn(1, 192)
-        val height = intrinsicHeight.coerceIn(1, 192)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        setBounds(0, 0, width, height)
-        draw(canvas)
-        bitmap.asImageBitmap()
-    } catch (_: Exception) {
-        null
     }
 }
