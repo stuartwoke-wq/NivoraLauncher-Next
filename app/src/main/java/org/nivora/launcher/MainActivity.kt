@@ -445,42 +445,18 @@ private fun NivoraHome(
                     Spacer(Modifier.height(14.dp))
 
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Panel)
-                            .padding(start = 14.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
                     ) {
-                        Text("⌕", color = Cyan, fontSize = 23.sp)
-                        Spacer(Modifier.size(10.dp))
-                        BasicTextField(
-                            value = search,
-                            onValueChange = { search = it; homePage = 0 },
-                            modifier = Modifier.weight(1f).padding(vertical = 11.dp),
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(
-                                color = Color.White,
-                                fontSize = 15.sp
-                            ),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            decorationBox = { innerTextField ->
-                                Box {
-                                    if (search.isEmpty()) {
-                                        Text("Search apps", color = Muted, fontSize = 15.sp)
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
                         Box {
                             Text(
                                 "⋮",
                                 color = Color.White,
                                 fontSize = 25.sp,
                                 modifier = Modifier
+                                    .clip(CircleShape)
                                     .clickable { menuExpanded = true }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
                             )
                             DropdownMenu(
                                 expanded = menuExpanded,
@@ -497,7 +473,7 @@ private fun NivoraHome(
                         }
                     }
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(8.dp))
 
                     val visibleHomeApps =
                         if (search.isBlank()) homeApps else filteredApps.take(pageSize)
@@ -613,8 +589,33 @@ private fun NivoraHome(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(bottom = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.12f))
+                                .clickable {
+                                    search = ""
+                                    screen = LauncherScreen.LIBRARY
+                                }
+                                .padding(horizontal = 18.dp, vertical = 9.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("⌕", color = Color.White, fontSize = 18.sp)
+                            Spacer(Modifier.size(7.dp))
+                            Text("Search", color = Color.White, fontSize = 13.sp)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(28.dp))
-                            .background(Panel)
+                            .background(Color.White.copy(alpha = 0.13f))
                             .padding(horizontal = 12.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
@@ -650,19 +651,6 @@ private fun NivoraHome(
                         }
                     }
 
-                    Spacer(Modifier.height(8.dp))
-
-                    if (appLoadTimeMs != null) {
-                        Text(
-                            text = "Diagnostic · load ${appLoadTimeMs} ms · $appLoadCount apps · icons ${homeIconConversionNs / 1_000_000} ms",
-                            color = Muted,
-                            fontSize = 10.sp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 4.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
                 }
 
                 LauncherScreen.LIBRARY -> {
