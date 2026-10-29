@@ -1122,7 +1122,7 @@ private fun NivoraHome(
                                 color = Muted,
                                 fontSize = 13.sp
                             )
-                            IconAppearance.values().chunked(2).forEach { rowOptions ->
+                            IconAppearance.values().toList().chunked(2).forEach { rowOptions ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)

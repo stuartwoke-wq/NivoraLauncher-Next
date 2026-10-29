@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.ColorMatrix
  * These filters approximate appearance styles; they do not modify the
  * installed apps' original icons or Nivora Launcher's own app icon.
  */
-internal enum class IconAppearance(
+enum class IconAppearance(
     val title: String,
     val storedValue: String
 ) {
