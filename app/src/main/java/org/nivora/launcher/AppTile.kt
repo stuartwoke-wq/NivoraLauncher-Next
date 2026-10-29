@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -36,6 +37,7 @@ internal fun AppTile(
     app: LauncherApp,
     onClick: () -> Unit,
     showLabel: Boolean = true,
+    iconSize: Dp = 48.dp,
     onIconConversionMeasured: ((String, Long) -> Unit)? = null
 ) {
     val iconResult = remember(app.icon) {
@@ -62,13 +64,13 @@ internal fun AppTile(
                 bitmap = iconBitmap,
                 contentDescription = app.label,
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(iconSize)
                     .clip(RoundedCornerShape(13.dp))
             )
         } else {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(iconSize)
                     .clip(RoundedCornerShape(13.dp))
                     .background(Panel),
                 contentAlignment = Alignment.Center

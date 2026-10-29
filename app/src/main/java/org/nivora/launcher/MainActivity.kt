@@ -237,6 +237,8 @@ private fun NivoraHome(
         LauncherPreferences(context.applicationContext)
     }
     val showAppLabels by preferences.showAppLabels.collectAsState(initial = true)
+    val homeGridColumns by preferences.homeGridColumns.collectAsState(initial = 4)
+    val homeIconSizeDp by preferences.homeIconSizeDp.collectAsState(initial = 48)
     val savedDockPackages by preferences.dockAppPackages.collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
 
@@ -293,7 +295,8 @@ private fun NivoraHome(
         apps.filter { it.label.contains(search.trim(), ignoreCase = true) }
     }
 
-    val pageSize = 16
+    val rowsPerPage = 4
+    val pageSize = homeGridColumns * rowsPerPage
     val pageCount = maxOf(1, (apps.size + pageSize - 1) / pageSize)
     val safePage = homePage.coerceIn(0, pageCount - 1)
 
@@ -560,7 +563,7 @@ private fun NivoraHome(
                                     filteredApps.take(pageSize)
                                 }
                                 LazyVerticalGrid(
-                                    columns = GridCells.Fixed(4),
+                                    columns = GridCells.Fixed(homeGridColumns),
                                     modifier = Modifier.fillMaxSize(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -570,6 +573,7 @@ private fun NivoraHome(
                                             app = app,
                                             onClick = { launchApp(app.packageName) },
                                             showLabel = showAppLabels,
+                                            iconSize = homeIconSizeDp.dp,
                                             onIconConversionMeasured = { packageName, elapsedNs ->
                                                 if (measuredHomeIconPackages.add(packageName)) {
                                                     homeIconConversionNs += elapsedNs
@@ -1074,11 +1078,123 @@ private fun NivoraHome(
                 }
 
                 LauncherScreen.HOME_SETTINGS -> {
-                    SettingsInfoPage(
-                        title = "Home screen",
-                        description = "Nivora currently provides the home screen, app library, app search, app labels, and dock selection. Custom grid sizes, icon sizing controls, and additional home screen layout options are not implemented yet.",
-                        onBack = { screen = LauncherScreen.SETTINGS }
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(top = 18.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Home screen",
+                                color = Color.White,
+                                fontSize = 25.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                text = "Back",
+                                color = Cyan,
+                                modifier = Modifier
+                                    .clickable { screen = LauncherScreen.SETTINGS }
+                                    .padding(8.dp)
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Panel)
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Grid columns",
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Choose how many app icons appear in each row.",
+                                color = Muted,
+                                fontSize = 13.sp
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(3, 4, 5, 6).forEach { columns ->
+                                    LayoutOption(
+                                        label = columns.toString(),
+                                        selected = homeGridColumns == columns,
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                preferences.setHomeGridColumns(columns)
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Panel)
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "App icon size",
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Select the icon size used on your home screen.",
+                                color = Muted,
+                                fontSize = 13.sp
+                            )
+
+                            val iconSizes = listOf(40, 44, 48, 52, 56, 60, 64)
+                            iconSizes.chunked(4).forEach { sizeRow ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    sizeRow.forEach { sizeDp ->
+                                        LayoutOption(
+                                            label = "${sizeDp} dp",
+                                            selected = homeIconSizeDp == sizeDp,
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    preferences.setHomeIconSizeDp(sizeDp)
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    repeat(4 - sizeRow.size) {
+                                        Spacer(Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = "Changes are saved on this device and apply to the home screen. The app library grid is unchanged.",
+                            color = Muted,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp
+                        )
+                    }
                 }
 
                 LauncherScreen.PRIVACY -> {
@@ -1302,6 +1418,30 @@ private fun NivoraHome(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LayoutOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Cyan.copy(alpha = 0.20f) else Midnight)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (selected) Cyan else Color.White,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }
 
