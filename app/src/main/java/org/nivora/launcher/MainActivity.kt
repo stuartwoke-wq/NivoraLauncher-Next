@@ -15,6 +15,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -68,6 +70,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import org.nivora.launcher.diagnostics.CrashReportStore
+import org.nivora.launcher.diagnostics.CrashReportSummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -183,7 +187,8 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class LauncherScreen {
-    HOME, LIBRARY, SETTINGS, DOCK, HOME_SETTINGS, PRIVACY, ABOUT
+    HOME, LIBRARY, SETTINGS, DOCK, HOME_SETTINGS, PRIVACY, ABOUT,
+    DEBUG_DIAGNOSTICS
 }
 
 @Composable
@@ -200,11 +205,31 @@ private fun NivoraHome(
     val measuredHomeIconPackages = remember { mutableSetOf<String>() }
     var search by remember { mutableStateOf("") }
     var screen by remember { mutableStateOf(LauncherScreen.HOME) }
+    var diagnosticReports by remember {
+        mutableStateOf(emptyList<CrashReportSummary>())
+    }
+    var diagnosticError by remember { mutableStateOf<String?>(null) }
     var homePage by remember { mutableStateOf(0) }
     var menuExpanded by remember { mutableStateOf(false) }
     val libraryGridState = rememberLazyGridState()
 
     val context = LocalContext.current
+
+    LaunchedEffect(screen) {
+        if (screen == LauncherScreen.DEBUG_DIAGNOSTICS) {
+            diagnosticError = null
+            try {
+                diagnosticReports = withContext(Dispatchers.IO) {
+                    CrashReportStore.listReports(context)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                diagnosticError = "Crash reports could not be read."
+                diagnosticReports = emptyList()
+            }
+        }
+    }
     val preferences = remember(context) {
         LauncherPreferences(context.applicationContext)
     }
@@ -1069,7 +1094,115 @@ private fun NivoraHome(
                     )
                 }
 
+                LauncherScreen.DEBUG_DIAGNOSTICS -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(top = 18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Debug & Diagnostics",
+                                color = Color.White,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                "Back",
+                                color = Cyan,
+                                modifier = Modifier
+                                    .clickable {
+                                        screen = LauncherScreen.SETTINGS
+                                    }
+                                    .padding(8.dp)
+                            )
+                        }
+
+                        Text(
+                            "Crash reports are stored locally in Nivora's private app storage. " +
+                                "This screen only lists report metadata.",
+                            color = Muted,
+                            fontSize = 13.sp
+                        )
+
+                        if (diagnosticError != null) {
+                            Text(
+                                diagnosticError.orEmpty(),
+                                color = Muted,
+                                fontSize = 14.sp
+                            )
+                        } else if (diagnosticReports.isEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Panel)
+                                    .padding(16.dp)
+                            ) {
+                                Text(
+                                    "No crash reports",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(Modifier.height(5.dp))
+                                Text(
+                                    "If Nivora saves a crash report in the future, it will appear here.",
+                                    color = Muted,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        } else {
+                            Text(
+                                "${diagnosticReports.size} report(s)",
+                                color = Cyan,
+                                fontSize = 14.sp
+                            )
+
+                            diagnosticReports.forEach { report ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Panel)
+                                        .padding(14.dp)
+                                ) {
+                                    Text(
+                                        report.fileName,
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Modified: ${java.util.Date(report.lastModified)}",
+                                        color = Muted,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        "Size: ${report.sizeBytes} bytes",
+                                        color = Muted,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 LauncherScreen.SETTINGS -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
                     Spacer(Modifier.height(18.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1131,6 +1264,7 @@ private fun NivoraHome(
                         "Home screen" to "Icon layout and pages",
                         "Dock" to "Choose up to four apps for your dock",
                         "Privacy" to "App discovery runs on this device",
+                        "Debug & Diagnostics" to "View locally stored crash reports",
                         "About Nivora" to "Version 0.1 · Development build"
                     ).forEach { (title, detail) ->
                         Column(
@@ -1144,6 +1278,7 @@ private fun NivoraHome(
                                         "Dock" -> LauncherScreen.DOCK
                                         "Home screen" -> LauncherScreen.HOME_SETTINGS
                                         "Privacy" -> LauncherScreen.PRIVACY
+                                        "Debug & Diagnostics" -> LauncherScreen.DEBUG_DIAGNOSTICS
                                         else -> LauncherScreen.ABOUT
                                     }
                                 }
@@ -1160,7 +1295,7 @@ private fun NivoraHome(
                         }
                     }
 
-                    Spacer(Modifier.weight(1f))
+                }
                 }
             }
         }

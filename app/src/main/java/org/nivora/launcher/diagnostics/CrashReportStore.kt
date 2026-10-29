@@ -9,8 +9,48 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
+internal data class CrashReportSummary(
+    val fileName: String,
+    val lastModified: Long,
+    val sizeBytes: Long
+)
+
 internal object CrashReportStore {
     private const val DIRECTORY_NAME = "crash-reports"
+
+    /**
+     * Lists metadata for the newest retained crash reports.
+     * This method does not read report contents or modify files.
+     */
+    fun listReports(context: Context): List<CrashReportSummary> {
+        return listReportsIn(File(context.filesDir, DIRECTORY_NAME))
+    }
+
+    /**
+     * Lists report metadata from a directory without reading or modifying files.
+     * Kept independent of Android Context so its behavior can be unit tested.
+     */
+    internal fun listReportsIn(directory: File): List<CrashReportSummary> {
+        if (!directory.isDirectory) return emptyList()
+
+        val files = directory.listFiles { file ->
+            file.isFile && file.name.endsWith(".txt")
+        } ?: return emptyList()
+
+        return files
+            .sortedWith(
+                compareByDescending<File> { it.lastModified() }
+                    .thenByDescending { it.name }
+            )
+            .take(CrashReportRetention.MAX_REPORTS)
+            .map { file ->
+                CrashReportSummary(
+                    fileName = file.name,
+                    lastModified = file.lastModified(),
+                    sizeBytes = file.length()
+                )
+            }
+    }
 
     fun save(context: Context, thread: Thread, throwable: Throwable) {
         val directory = File(context.filesDir, DIRECTORY_NAME)
