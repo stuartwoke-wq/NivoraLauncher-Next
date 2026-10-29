@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.SystemClock
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
@@ -106,6 +107,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+        window.setBackgroundDrawableResource(android.R.color.transparent)
         window.statusBarColor = Midnight.toArgb()
         window.navigationBarColor = Midnight.toArgb()
 
@@ -425,7 +428,7 @@ private fun NivoraHome(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Midnight
+        color = if (screen == LauncherScreen.HOME) Color.Transparent else Midnight
     ) {
         Column(
             modifier = Modifier
