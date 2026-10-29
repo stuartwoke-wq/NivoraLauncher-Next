@@ -15,6 +15,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -236,7 +237,11 @@ private fun NivoraHome(
     val preferences = remember(context) {
         LauncherPreferences(context.applicationContext)
     }
+    val isSystemDark = isSystemInDarkTheme()
     val showAppLabels by preferences.showAppLabels.collectAsState(initial = true)
+    val iconAppearance by preferences.iconAppearance.collectAsState(
+        initial = IconAppearance.SYSTEM_DEFAULT
+    )
     val homeGridColumns by preferences.homeGridColumns.collectAsState(initial = 4)
     val homeIconSizeDp by preferences.homeIconSizeDp.collectAsState(initial = 48)
     val savedDockPackages by preferences.dockAppPackages.collectAsState(initial = null)
@@ -550,6 +555,7 @@ private fun NivoraHome(
                                             onClick = { launchApp(app.packageName) },
                                             showLabel = showAppLabels,
                                             iconSize = homeIconSizeDp.dp,
+                                            iconAppearance = iconAppearance,
                                             onIconConversionMeasured = { packageName, elapsedNs ->
                                                 if (measuredHomeIconPackages.add(packageName)) {
                                                     homeIconConversionNs += elapsedNs
@@ -638,7 +644,8 @@ private fun NivoraHome(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(3.dp)
-                                            .clip(RoundedCornerShape(14.dp))
+                                            .clip(RoundedCornerShape(14.dp)),
+                                        colorFilter = iconAppearance.colorFilter(isSystemDark)
                                     )
                                 } else {
                                     Text(
@@ -783,7 +790,8 @@ private fun NivoraHome(
                                 AppTile(
                                     app = app,
                                     onClick = { launchApp(app.packageName) },
-                                    showLabel = showAppLabels
+                                    showLabel = showAppLabels,
+                                    iconAppearance = iconAppearance
                                 )
                             }
                         }
@@ -874,7 +882,8 @@ private fun NivoraHome(
                                         androidx.compose.foundation.Image(
                                             bitmap = previewBitmap,
                                             contentDescription = previewApp.label,
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier.size(32.dp),
+                                            colorFilter = iconAppearance.colorFilter(isSystemDark)
                                         )
                                     } else {
                                         Text(
@@ -1006,6 +1015,7 @@ private fun NivoraHome(
                                 AppTile(
                                     app = app,
                                     showLabel = true,
+                                    iconAppearance = iconAppearance,
                                     onClick = {
                                         if (selectedIndex >= 0) {
                                             useAutomaticDock = false
@@ -1091,6 +1101,49 @@ private fun NivoraHome(
                                     .clickable { screen = LauncherScreen.SETTINGS }
                                     .padding(8.dp)
                             )
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Panel)
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Icon appearance",
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Choose an icon treatment. Clear is a subtle translucency effect, not a full Liquid Glass recreation yet.",
+                                color = Muted,
+                                fontSize = 13.sp
+                            )
+                            IconAppearance.values().chunked(2).forEach { rowOptions ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowOptions.forEach { appearance ->
+                                        LayoutOption(
+                                            label = appearance.title,
+                                            selected = iconAppearance == appearance,
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    preferences.setIconAppearance(appearance)
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    if (rowOptions.size == 1) {
+                                        Spacer(Modifier.weight(1f))
+                                    }
+                                }
+                            }
                         }
 
                         Column(

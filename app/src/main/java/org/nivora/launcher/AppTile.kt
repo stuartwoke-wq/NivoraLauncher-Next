@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.os.SystemClock
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,8 +39,10 @@ internal fun AppTile(
     onClick: () -> Unit,
     showLabel: Boolean = true,
     iconSize: Dp = 48.dp,
+    iconAppearance: IconAppearance = IconAppearance.SYSTEM_DEFAULT,
     onIconConversionMeasured: ((String, Long) -> Unit)? = null
 ) {
+    val isSystemDark = isSystemInDarkTheme()
     val iconResult = remember(app.icon) {
         val startedAt = SystemClock.elapsedRealtimeNanos()
         val bitmap = app.icon.toImageBitmap()
@@ -65,7 +68,8 @@ internal fun AppTile(
                 contentDescription = app.label,
                 modifier = Modifier
                     .size(iconSize)
-                    .clip(RoundedCornerShape(13.dp))
+                    .clip(RoundedCornerShape(13.dp)),
+                colorFilter = iconAppearance.colorFilter(isSystemDark)
             )
         } else {
             Box(

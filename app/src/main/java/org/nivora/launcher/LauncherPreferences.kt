@@ -21,6 +21,7 @@ class LauncherPreferences(private val context: Context) {
 
     private companion object {
         val SHOW_APP_LABELS = booleanPreferencesKey("show_app_labels")
+        val HOME_ICON_APPEARANCE = stringPreferencesKey("home_icon_appearance")
         val HOME_GRID_COLUMNS = intPreferencesKey("home_grid_columns")
         val HOME_ICON_SIZE_DP = intPreferencesKey("home_icon_size_dp")
         val DOCK_APP_PACKAGES = stringPreferencesKey("dock_app_packages")
@@ -30,6 +31,17 @@ class LauncherPreferences(private val context: Context) {
         context.nivoraDataStore.data.map { preferences ->
             preferences[SHOW_APP_LABELS] ?: true
         }
+
+    val iconAppearance: Flow<IconAppearance> =
+        context.nivoraDataStore.data.map { preferences ->
+            IconAppearance.fromStoredValue(preferences[HOME_ICON_APPEARANCE])
+        }
+
+    suspend fun setIconAppearance(appearance: IconAppearance) {
+        context.nivoraDataStore.edit { preferences ->
+            preferences[HOME_ICON_APPEARANCE] = appearance.storedValue
+        }
+    }
 
     suspend fun setShowAppLabels(enabled: Boolean) {
         context.nivoraDataStore.edit { preferences ->
